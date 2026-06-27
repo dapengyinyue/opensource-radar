@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/client.ts","./src/api/types.ts","./src/components/filterbar.tsx","./src/components/metricsparkline.tsx","./src/components/rankingtable.tsx","./src/components/sourcebadge.tsx","./src/lib/queryclient.ts","./src/pages/homepage.tsx","./src/pages/projectdetailpage.tsx"],"version":"5.9.3"}

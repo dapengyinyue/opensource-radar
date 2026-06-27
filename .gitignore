@@ -1,0 +1,22 @@
+# Rust
+/target
+**/target
+Cargo.lock.bak
+
+# env
+.env
+.env.local
+
+# sqlx offline cache is committed; keep .sqlx/
+# (no ignore)
+
+# frontend
+/frontend/node_modules
+/frontend/dist
+/frontend/.vite
+
+# editor / OS
+.DS_Store
+.idea
+.vscode
+*.swp

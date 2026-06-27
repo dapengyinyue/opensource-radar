@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: openradar-pg
+    environment:
+      POSTGRES_USER: openradar
+      POSTGRES_PASSWORD: openradar
+      POSTGRES_DB: openradar
+    ports:
+      - "5432:5432"
+    volumes:
+      - openradar-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openradar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  openradar-pgdata:

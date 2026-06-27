@@ -1,0 +1,70 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/domain",
+    "crates/storage",
+    "crates/collector",
+    "crates/server",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+# async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+async-trait = "0.1"
+
+# web
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "cors"] }
+
+# db
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "chrono",
+    "json",
+    "macros",
+    "migrate",
+] }
+
+# http client
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+    "json",
+    "gzip",
+] }
+
+# serialization / time
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+
+# observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# errors
+thiserror = "2"
+anyhow = "1"
+
+# rate limiting
+governor = "0.7"
+
+# config
+dotenvy = "0.15"
+
+# internal crates
+domain = { path = "crates/domain" }
+storage = { path = "crates/storage" }
+collector = { path = "crates/collector" }
+
+[profile.release]
+lto = "thin"
+strip = true

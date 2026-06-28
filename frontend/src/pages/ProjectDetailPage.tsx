@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getProject, listSnapshots } from "../api/client";
 import SourceBadge from "../components/SourceBadge";
 import MetricSparkline from "../components/MetricSparkline";
+import { formatCompact, minutesAgo } from "../lib/format";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -16,6 +17,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const numId = Number(id);
+  // 进入详情时携带的首页筛选参数，返回时还原（P0-2）
+  const [searchParams] = useSearchParams();
+  const returnSearch = searchParams.toString();
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ["project", numId],
@@ -35,7 +39,10 @@ export default function ProjectDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
+        <Link
+          to={{ pathname: "/", search: returnSearch }}
+          className="text-sm text-blue-600 hover:underline"
+        >
           ← 返回榜单
         </Link>
       </div>
@@ -52,9 +59,9 @@ export default function ProjectDetailPage() {
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-x-8 md:grid-cols-2">
-          <Field label="Stars">{project.stars ?? "-"}</Field>
-          <Field label="HN Points">{project.hn_points ?? "-"}</Field>
-          <Field label="Forks">{project.forks ?? "-"}</Field>
+          <Field label="Stars">{formatCompact(project.stars)}</Field>
+          <Field label="HN Points">{formatCompact(project.hn_points)}</Field>
+          <Field label="Forks">{formatCompact(project.forks)}</Field>
           <Field label="HN 评论">{project.hn_comment_count ?? "-"}</Field>
           <Field label="语言">{project.language ?? "-"}</Field>
           <Field label="Open Issues">{project.open_issues ?? "-"}</Field>
@@ -70,6 +77,7 @@ export default function ProjectDetailPage() {
           <Field label="活跃时间">
             {project.last_activity_at ? new Date(project.last_activity_at).toLocaleString() : "-"}
           </Field>
+          <Field label="数据采集">{minutesAgo(project.last_collected_at)}</Field>
           <Field label="仓库">
             {project.repo_url ? (
               <a className="text-blue-600 hover:underline" href={project.repo_url} target="_blank" rel="noreferrer">

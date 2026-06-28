@@ -10,6 +10,9 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
+# 限制编译并行度，低内存机器避免 OOM；高内存机器可 --build-arg CARGO_BUILD_JOBS=N 覆盖
+ARG CARGO_BUILD_JOBS=2
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 COPY --from=planner /app/recipe.json recipe.json
 # 先构建依赖（命中缓存层）
 RUN cargo chef cook --release --recipe-path recipe.json

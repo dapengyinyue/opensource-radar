@@ -15,6 +15,7 @@ pub struct ListParams {
     pub language: Option<String>,
     pub topic: Option<String>,
     pub source: Option<String>,
+    pub q: Option<String>,
     #[serde(default)]
     pub sort: String,
     #[serde(default)]
@@ -39,6 +40,7 @@ impl ListParams {
             language: self.language.clone(),
             topic: self.topic.clone(),
             source: self.source.clone(),
+            q: self.q.clone(),
             sort: Sort::parse(&self.sort),
             since,
             page: self.page,

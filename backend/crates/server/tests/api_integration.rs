@@ -112,6 +112,40 @@ async fn list_and_detail() {
 }
 
 #[tokio::test]
+async fn list_filters_by_query() {
+    let _g = SERIALIZE.lock().await;
+    let (state, _pool) = setup().await;
+    let app = router(state);
+
+    // gh: name="tokio"; hn_ext: name="Axum"
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/projects?q=tokio")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let v = body_json(resp).await;
+    assert_eq!(v["total"], 1);
+    assert_eq!(v["data"][0]["name"], "tokio");
+
+    // 大小写不敏感 + 命中 hn_ext 的 name "Axum"
+    let resp = app
+        .oneshot(
+            Request::get("/api/v1/projects?q=axum")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let v = body_json(resp).await;
+    assert_eq!(v["total"], 1);
+    assert_eq!(v["data"][0]["name"], "Axum");
+}
+
+#[tokio::test]
 async fn list_filters_by_language() {
     let _g = SERIALIZE.lock().await;
     let (state, _pool) = setup().await;

@@ -1,7 +1,7 @@
 export default function SourceBadge({ source }: { source: string }) {
   const styles: Record<string, string> = {
     github: "bg-slate-800 text-white",
-    hackernews: "bg-orange-500 text-white",
+    hackernews: "bg-orange-600 text-white",
   };
   return (
     <span

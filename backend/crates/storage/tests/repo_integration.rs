@@ -113,6 +113,43 @@ async fn hn_non_github_link_is_separate_project() {
 }
 
 #[tokio::test]
+async fn search_by_query_matches_name_full_name_description() {
+    let _g = SERIALIZE.lock().await;
+    let pool = setup().await;
+    // gh: name="tokio", full_name="tokio-rs/tokio", description="async runtime"
+    storage::repo::persist_raw_item(&pool, &RawItem::GithubRepo(gh()))
+        .await
+        .unwrap();
+    // hn: 非 github 外链，name/description = title = "Tokio on HN"
+    storage::repo::persist_raw_item(
+        &pool,
+        &RawItem::HnStory(hn(Some("https://crates.io/crates/axum"), "333")),
+    )
+    .await
+    .unwrap();
+
+    let mk = |q: &str| project::ProjectFilter {
+        q: Some(q.into()),
+        per_page: 100,
+        ..Default::default()
+    };
+
+    // "tokio" 命中两条：gh name=tokio，hn name="Tokio on HN"（ILIKE 大小写不敏感）
+    let hits = project::list(&pool, &mk("tokio")).await.unwrap();
+    assert_eq!(hits.len(), 2);
+    assert_eq!(project::count(&pool, &mk("tokio")).await.unwrap(), 2);
+
+    // "runtime" 仅命中 gh（description="async runtime"）
+    let hits = project::list(&pool, &mk("runtime")).await.unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].name, "tokio");
+
+    // 无匹配
+    assert_eq!(project::list(&pool, &mk("nonexistent-zzz")).await.unwrap().len(), 0);
+    assert_eq!(project::count(&pool, &mk("nonexistent-zzz")).await.unwrap(), 0);
+}
+
+#[tokio::test]
 async fn list_filters_and_pagination() {
     let _g = SERIALIZE.lock().await;
     let pool = setup().await;

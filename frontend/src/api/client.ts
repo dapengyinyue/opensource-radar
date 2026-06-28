@@ -25,6 +25,7 @@ export interface ListParams {
   language?: string;
   topic?: string;
   source?: string;
+  q?: string;
   sort?: Sort;
   since?: Since;
 }

@@ -3,18 +3,47 @@ services:
     image: postgres:16
     container_name: openradar-pg
     environment:
-      POSTGRES_USER: openradar
-      POSTGRES_PASSWORD: openradar
-      POSTGRES_DB: openradar
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-openradar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openradar}
+      POSTGRES_DB: ${POSTGRES_DB:-openradar}
     volumes:
       - openradar-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openradar"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openradar}"]
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: openradar-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 指向 compose 内的 postgres 服务
+      DATABASE_URL: postgres://${POSTGRES_USER:-openradar}:${POSTGRES_PASSWORD:-openradar}@postgres:5432/${POSTGRES_DB:-openradar}
+      BIND_ADDR: 0.0.0.0:8080
+      RUST_LOG: ${RUST_LOG:-info}
+      SCHEDULE_GITHUB_SECS: ${SCHEDULE_GITHUB_SECS:-3600}
+      SCHEDULE_HN_SECS: ${SCHEDULE_HN_SECS:-1800}
+    # 敏感项从 .env 注入
+    env_file:
+      - .env
+    restart: unless-stopped
+    # 不暴露端口：仅容器内网络可达，由 frontend(nginx) 反代
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: openradar-frontend
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
 
 volumes:
   openradar-pgdata:

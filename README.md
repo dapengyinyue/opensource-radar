@@ -39,4 +39,12 @@ curl 'localhost:8080/api/v1/projects?sort=hottest&per_page=20' | jq
 cd frontend && pnpm install && pnpm dev   # http://localhost:5173
 ```
 
-详见 `docs/` 与计划文件。
+## 部署到 Linux（Docker Compose）
+
+一键起 postgres + backend + frontend(nginx) 三容器，详见 [DEPLOY.md](./DEPLOY.md)。
+
+```bash
+cp .env.example .env   # 改 POSTGRES_PASSWORD / ADMIN_TOKEN / GITHUB_TOKENS
+docker compose up -d --build
+```
+

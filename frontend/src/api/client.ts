@@ -2,6 +2,7 @@ import type {
   Facet,
   ListResponse,
   Project,
+  ProjectSources,
   Snapshot,
   SourceStatus,
   Sort,
@@ -56,4 +57,8 @@ export function listTopics(): Promise<Facet[]> {
 
 export function getSourcesStatus(): Promise<SourceStatus[]> {
   return getJSON<SourceStatus[]>(`/sources/status`);
+}
+
+export function getProjectSources(id: number): Promise<ProjectSources> {
+  return getJSON<ProjectSources>(`/projects/${id}/sources`);
 }

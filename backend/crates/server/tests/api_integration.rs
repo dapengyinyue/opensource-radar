@@ -268,3 +268,70 @@ async fn admin_auth_and_validation() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
 }
+
+#[tokio::test]
+async fn project_sources_returns_github_and_hn() {
+    let _g = SERIALIZE.lock().await;
+    let (state, pool) = setup().await;
+
+    // 在 tokio project 上追加一条指向它的 HN 故事 → 合并项目（github + hackernews）
+    let merged = HnStoryRaw {
+        object_id: "888".into(),
+        hn_url: "https://news.ycombinator.com/item?id=888".into(),
+        linked_url: Some("https://github.com/tokio-rs/tokio".into()),
+        title: "Tokio discussion".into(),
+        author: Some("bob".into()),
+        points: Some(80),
+        comment_count: Some(10),
+        posted_at: Some(ts()),
+        extra: serde_json::json!({}),
+    };
+    storage::repo::persist_raw_item(&pool, &RawItem::HnStory(merged))
+        .await
+        .unwrap();
+
+    let app = router(state);
+    let tokio_id: i64 = sqlx::query_scalar(
+        "SELECT id FROM projects WHERE dedup_key = 'gh:tokio-rs/tokio'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::get(format!("/api/v1/projects/{tokio_id}/sources"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_json(resp).await;
+    // github repo 明细
+    assert_eq!(v["github"]["full_name"], "tokio-rs/tokio");
+    // 至少一条 HN 故事（888），按 points desc 排序
+    let hn = v["hackernews"].as_array().unwrap();
+    assert!(!hn.is_empty());
+    assert_eq!(hn[0]["object_id"], "888");
+    assert_eq!(hn[0]["hn_url"], "https://news.ycombinator.com/item?id=888");
+    assert_eq!(hn[0]["author"], "bob");
+}
+
+#[tokio::test]
+async fn project_sources_404_for_missing() {
+    let _g = SERIALIZE.lock().await;
+    let (state, _pool) = setup().await;
+    let app = router(state);
+
+    let resp = app
+        .oneshot(
+            Request::get("/api/v1/projects/999999/sources")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}

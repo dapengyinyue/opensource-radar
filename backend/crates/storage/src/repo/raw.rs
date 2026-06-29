@@ -1,7 +1,8 @@
 use anyhow::Result;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use domain::source::{GithubRepoRaw, HnStoryRaw};
-use sqlx::PgExecutor;
+use serde::Serialize;
+use sqlx::{FromRow, PgExecutor, PgPool};
 
 pub async fn upsert_github<'e, E>(exec: E, project_id: i64, g: &GithubRepoRaw) -> Result<()>
 where
@@ -50,4 +51,49 @@ where
     .execute(exec)
     .await?;
     Ok(())
+}
+
+/// 项目的 HN 故事原始记录（详情页 HN 讨论外链用）。
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct HnStoryRecord {
+    pub object_id: String,
+    pub hn_url: String,
+    pub linked_url: Option<String>,
+    pub author: Option<String>,
+    pub points: Option<i64>,
+    pub comment_count: Option<i64>,
+    pub posted_at: Option<DateTime<Utc>>,
+}
+
+/// 项目的 GitHub repo 原始记录。
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct GithubRepoRecord {
+    pub full_name: String,
+    pub node_id: Option<String>,
+}
+
+/// 详情页「来源明细」聚合：一个项目被哪些源的哪些原始记录观察到。
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectSources {
+    pub github: Option<GithubRepoRecord>,
+    pub hackernews: Vec<HnStoryRecord>,
+}
+
+pub async fn list_project_sources(pool: &PgPool, project_id: i64) -> Result<ProjectSources> {
+    let github = sqlx::query_as::<_, GithubRepoRecord>(
+        "SELECT full_name, node_id FROM raw_github_repos WHERE project_id = $1 LIMIT 1",
+    )
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let hackernews = sqlx::query_as::<_, HnStoryRecord>(
+        "SELECT object_id, hn_url, linked_url, author, points, comment_count, posted_at \
+         FROM raw_hn_stories WHERE project_id = $1 ORDER BY points DESC NULLS LAST",
+    )
+    .bind(project_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(ProjectSources { github, hackernews })
 }

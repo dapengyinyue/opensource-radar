@@ -52,5 +52,25 @@ export interface SourceStatus {
   project_count: number;
 }
 
+export interface GithubRepoRecord {
+  full_name: string;
+  node_id: string | null;
+}
+
+export interface HnStoryRecord {
+  object_id: string;
+  hn_url: string;
+  linked_url: string | null;
+  author: string | null;
+  points: number | null;
+  comment_count: number | null;
+  posted_at: string | null;
+}
+
+export interface ProjectSources {
+  github: GithubRepoRecord | null;
+  hackernews: HnStoryRecord[];
+}
+
 export type Sort = "hottest" | "stars" | "recent" | "hn_points";
 export type Since = "7d" | "30d" | "all";

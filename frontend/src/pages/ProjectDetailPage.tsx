@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getProject, listSnapshots } from "../api/client";
+import { getProject, getProjectSources, listSnapshots } from "../api/client";
 import SourceBadge from "../components/SourceBadge";
 import MetricSparkline from "../components/MetricSparkline";
-import { formatCompact, minutesAgo } from "../lib/format";
+import { formatCompact, minutesAgo, timeAgo } from "../lib/format";
+import type { HnStoryRecord } from "../api/types";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -14,10 +15,56 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <h2 className="mb-2 font-medium">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function HnStoryRow({ s }: { s: HnStoryRecord }) {
+  return (
+    <div className="border-t py-2 first:border-t-0">
+      <div className="flex items-center gap-2 text-sm">
+        <a
+          className="font-medium text-orange-700 hover:underline"
+          href={s.hn_url}
+          target="_blank"
+          rel="noreferrer"
+        >
+          查看 HN 讨论 ↗
+        </a>
+        <span className="text-slate-400">·</span>
+        <span className="text-slate-600">{formatCompact(s.points)} 分</span>
+        <span className="text-slate-400">·</span>
+        <span className="text-slate-600">{s.comment_count ?? "-"} 评论</span>
+      </div>
+      <div className="text-xs text-slate-500">
+        {s.author ? `by ${s.author} · ` : ""}
+        {s.posted_at ? timeAgo(s.posted_at) : ""}
+        {s.linked_url && (
+          <>
+            {" · "}
+            <a
+              className="text-blue-600 hover:underline"
+              href={s.linked_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              外链
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const numId = Number(id);
-  // 进入详情时携带的首页筛选参数，返回时还原（P0-2）
   const [searchParams] = useSearchParams();
   const returnSearch = searchParams.toString();
 
@@ -31,10 +78,19 @@ export default function ProjectDetailPage() {
     queryFn: () => listSnapshots(numId),
     enabled: Number.isFinite(numId),
   });
+  const { data: sources } = useQuery({
+    queryKey: ["projectSources", numId],
+    queryFn: () => getProjectSources(numId),
+    enabled: Number.isFinite(numId),
+  });
 
   if (isLoading) return <p className="text-slate-500">加载中…</p>;
   if (error) return <p className="text-red-600">加载失败：{(error as Error).message}</p>;
   if (!project) return <p className="text-slate-500">未找到项目。</p>;
+
+  const hasGithub = project.source_kinds.includes("github");
+  const hasHn = project.source_kinds.includes("hackernews");
+  const isCrossSource = hasGithub && hasHn;
 
   return (
     <div className="space-y-6">
@@ -54,15 +110,14 @@ export default function ProjectDetailPage() {
             <SourceBadge key={s} source={s} />
           ))}
         </div>
-        {project.description && (
-          <p className="mt-1 text-slate-600">{project.description}</p>
+        {project.description && <p className="mt-1 text-slate-600">{project.description}</p>}
+        {isCrossSource && (
+          <p className="mt-2 text-xs text-slate-500">
+            ⓘ 同时被 GitHub 与 HackerNews 收录
+          </p>
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-x-8 md:grid-cols-2">
-          <Field label="Stars">{formatCompact(project.stars)}</Field>
-          <Field label="HN Points">{formatCompact(project.hn_points)}</Field>
-          <Field label="Forks">{formatCompact(project.forks)}</Field>
-          <Field label="HN 评论">{project.hn_comment_count ?? "-"}</Field>
           <Field label="语言">{project.language ?? "-"}</Field>
           <Field label="Open Issues">{project.open_issues ?? "-"}</Field>
           <Field label="Topics">
@@ -80,7 +135,12 @@ export default function ProjectDetailPage() {
           <Field label="数据采集">{minutesAgo(project.last_collected_at)}</Field>
           <Field label="仓库">
             {project.repo_url ? (
-              <a className="text-blue-600 hover:underline" href={project.repo_url} target="_blank" rel="noreferrer">
+              <a
+                className="text-blue-600 hover:underline"
+                href={project.repo_url}
+                target="_blank"
+                rel="noreferrer"
+              >
                 {project.repo_url}
               </a>
             ) : (
@@ -89,7 +149,12 @@ export default function ProjectDetailPage() {
           </Field>
           <Field label="主页">
             {project.homepage_url ? (
-              <a className="text-blue-600 hover:underline" href={project.homepage_url} target="_blank" rel="noreferrer">
+              <a
+                className="text-blue-600 hover:underline"
+                href={project.homepage_url}
+                target="_blank"
+                rel="noreferrer"
+              >
                 {project.homepage_url}
               </a>
             ) : (
@@ -99,10 +164,45 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border bg-white p-4">
-        <h2 className="mb-2 font-medium">指标趋势（快照）</h2>
+      {hasGithub && (
+        <Section title="GitHub 指标">
+          <div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
+            <Field label="Stars">{formatCompact(project.stars)}</Field>
+            <Field label="Forks">{formatCompact(project.forks)}</Field>
+            <Field label="仓库创建">
+              {project.github_created_at
+                ? new Date(project.github_created_at).toLocaleDateString()
+                : "-"}
+            </Field>
+            <Field label="仓库更新">
+              {project.github_updated_at
+                ? new Date(project.github_updated_at).toLocaleString()
+                : "-"}
+            </Field>
+          </div>
+        </Section>
+      )}
+
+      {hasHn && (
+        <Section title="HackerNews 热度">
+          <div className="mb-2 grid grid-cols-1 gap-x-8 md:grid-cols-2">
+            <Field label="HN Points">{formatCompact(project.hn_points)}</Field>
+            <Field label="HN 评论">{project.hn_comment_count ?? "-"}</Field>
+          </div>
+          {sources && sources.hackernews.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs text-slate-500">相关 HN 讨论</p>
+              {sources.hackernews.map((s) => (
+                <HnStoryRow key={s.object_id} s={s} />
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      <Section title="指标趋势（快照）">
         <MetricSparkline snapshots={snapshots ?? []} />
-      </div>
+      </Section>
     </div>
   );
 }

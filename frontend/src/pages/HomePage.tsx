@@ -1,6 +1,6 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { listLanguages, listProjects } from "../api/client";
+import { listLanguages, listProjects, listTopics } from "../api/client";
 import type { Sort, Since } from "../api/types";
 import FilterBar, { type FilterState } from "../components/FilterBar";
 import RankingTable from "../components/RankingTable";
@@ -26,6 +26,7 @@ export default function HomePage() {
   const [params, setParams] = useSearchParams();
   const filter: FilterState = {
     language: params.get("language") ?? "",
+    topic: params.get("topic") ?? "",
     source: params.get("source") ?? "all",
     sort: parseSort(params.get("sort")),
     since: parseSince(params.get("since")),
@@ -37,6 +38,7 @@ export default function HomePage() {
   const update = (next: FilterState) => {
     const p = new URLSearchParams();
     if (next.language) p.set("language", next.language);
+    if (next.topic) p.set("topic", next.topic);
     if (next.source && next.source !== "all") p.set("source", next.source);
     if (next.sort !== "hottest") p.set("sort", next.sort);
     if (next.since !== "all") p.set("since", next.since);
@@ -54,6 +56,7 @@ export default function HomePage() {
 
   const hasFilter =
     !!filter.language ||
+    !!filter.topic ||
     (filter.source && filter.source !== "all") ||
     filter.sort !== "hottest" ||
     filter.since !== "all" ||
@@ -62,6 +65,10 @@ export default function HomePage() {
   const { data: langFacets } = useQuery({
     queryKey: ["languages"],
     queryFn: listLanguages,
+  });
+  const { data: topicFacets } = useQuery({
+    queryKey: ["topics"],
+    queryFn: listTopics,
   });
 
   const { data, isPending, isFetching, error } = useQuery({
@@ -72,6 +79,7 @@ export default function HomePage() {
         per_page: PER_PAGE,
         q: q || undefined,
         language: filter.language || undefined,
+        topic: filter.topic || undefined,
         source: filter.source && filter.source !== "all" ? filter.source : undefined,
         sort: filter.sort,
         since: filter.since,
@@ -81,7 +89,12 @@ export default function HomePage() {
 
   return (
     <div className="space-y-4">
-      <FilterBar value={filter} languages={langFacets ?? []} onChange={update} />
+      <FilterBar
+        value={filter}
+        languages={langFacets ?? []}
+        topics={topicFacets ?? []}
+        onChange={update}
+      />
       <SourceFreshness />
 
       {q && (

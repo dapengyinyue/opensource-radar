@@ -3,6 +3,7 @@ import { SORT_LABELS, SINCE_LABELS } from "../lib/format";
 
 export interface FilterState {
   language: string;
+  topic: string;
   source: string;
   sort: Sort;
   since: Since;
@@ -11,6 +12,7 @@ export interface FilterState {
 interface Props {
   value: FilterState;
   languages: { key: string; count: number }[];
+  topics: { key: string; count: number }[];
   onChange: (next: FilterState) => void;
 }
 
@@ -22,7 +24,7 @@ const SOURCES: [string, string][] = [
   ["hackernews", "HackerNews"],
 ];
 
-export default function FilterBar({ value, languages, onChange }: Props) {
+export default function FilterBar({ value, languages, topics, onChange }: Props) {
   const set = (patch: Partial<FilterState>) => onChange({ ...value, ...patch });
 
   return (
@@ -38,6 +40,22 @@ export default function FilterBar({ value, languages, onChange }: Props) {
           {languages.map((l) => (
             <option key={l.key} value={l.key}>
               {l.key} ({l.count})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex items-center gap-1 text-sm">
+        Topic
+        <select
+          className="rounded border px-2 py-1"
+          value={value.topic}
+          onChange={(e) => set({ topic: e.target.value })}
+        >
+          <option value="">全部</option>
+          {topics.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.key} ({t.count})
             </option>
           ))}
         </select>

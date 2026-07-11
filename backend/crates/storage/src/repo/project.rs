@@ -97,13 +97,14 @@ where
     Ok(id)
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Sort {
     #[default]
     Hottest,
     Stars,
     Recent,
     HnPoints,
+    Rising,
 }
 
 impl Sort {
@@ -112,6 +113,7 @@ impl Sort {
             "stars" => Sort::Stars,
             "recent" => Sort::Recent,
             "hn_points" => Sort::HnPoints,
+            "rising" => Sort::Rising,
             _ => Sort::Hottest,
         }
     }
@@ -123,6 +125,7 @@ impl Sort {
             Sort::Stars => "stars DESC NULLS LAST",
             Sort::Recent => "last_activity_at DESC NULLS LAST",
             Sort::HnPoints => "hn_points DESC NULLS LAST",
+            Sort::Rising => "stars DESC NULLS LAST", // 占位；Rising 走独立查询，不经 list
         }
     }
 }
@@ -225,4 +228,42 @@ where
     .fetch_one(exec)
     .await?;
     Ok(n)
+}
+
+/// 上升最快：比较每个项目「最近快照」与「hours 小时前快照」的 stars 增量，
+/// 按增量降序返回。仅返回增量 > 0 的项目。独立查询，不走 list 的 filter 体系。
+pub async fn rising(pool: &sqlx::PgPool, hours: i32, limit: i64) -> Result<Vec<Project>> {
+    let sql = format!(
+        r#"
+        WITH latest AS (
+            SELECT DISTINCT ON (project_id) project_id, stars
+            FROM project_snapshots
+            WHERE captured_at >= now() - make_interval(hours => $1)
+            ORDER BY project_id, captured_at DESC
+        ),
+        past AS (
+            SELECT DISTINCT ON (project_id) project_id, stars AS past_stars
+            FROM project_snapshots
+            WHERE captured_at <= now() - make_interval(hours => $1)
+            ORDER BY project_id, captured_at DESC
+        ),
+        ranked AS (
+            SELECT l.project_id, (l.stars - COALESCE(p.past_stars, l.stars)) AS star_delta
+            FROM latest l
+            LEFT JOIN past p ON p.project_id = l.project_id
+            WHERE l.stars IS NOT NULL
+        )
+        {SELECT_COLS}
+        JOIN ranked r ON r.project_id = projects.id
+        WHERE r.star_delta > 0
+        ORDER BY r.star_delta DESC
+        LIMIT $2
+        "#,
+    );
+    let rows = sqlx::query_as::<_, Project>(&sql)
+        .bind(hours)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows)
 }

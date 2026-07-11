@@ -37,6 +37,7 @@ export const SORT_LABELS: Record<string, string> = {
   stars: "Stars 数",
   recent: "最近活跃",
   hn_points: "HN 热度",
+  rising: "上升最快",
 };
 
 export const SINCE_LABELS: Record<string, string> = {

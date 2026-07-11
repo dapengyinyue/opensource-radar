@@ -72,5 +72,5 @@ export interface ProjectSources {
   hackernews: HnStoryRecord[];
 }
 
-export type Sort = "hottest" | "stars" | "recent" | "hn_points";
+export type Sort = "hottest" | "stars" | "recent" | "hn_points" | "rising";
 export type Since = "7d" | "30d" | "all";

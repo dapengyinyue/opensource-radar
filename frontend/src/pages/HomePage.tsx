@@ -10,7 +10,7 @@ import SourceFreshness from "../components/SourceFreshness";
 const PER_PAGE = 50;
 
 function parseSort(s: string | null): Sort {
-  return (["hottest", "stars", "recent", "hn_points"] as const).includes(s as Sort)
+  return (["hottest", "stars", "recent", "hn_points", "rising"] as const).includes(s as Sort)
     ? (s as Sort)
     : "hottest";
 }

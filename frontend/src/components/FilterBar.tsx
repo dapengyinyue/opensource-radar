@@ -16,7 +16,7 @@ interface Props {
   onChange: (next: FilterState) => void;
 }
 
-const SORTS: Sort[] = ["hottest", "stars", "recent", "hn_points"];
+const SORTS: Sort[] = ["hottest", "stars", "recent", "hn_points", "rising"];
 const SINCES: Since[] = ["7d", "30d", "all"];
 const SOURCES: [string, string][] = [
   ["all", "全部"],

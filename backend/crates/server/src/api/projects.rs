@@ -64,7 +64,21 @@ pub async fn list(
 ) -> Result<Json<ListResponse>, ApiError> {
     let f = p.to_filter();
     let page = f.page;
-    let per_page = f.per_page;
+    let per_page = f.per_page.clamp(1, 100);
+
+    // Rising 走独立查询（按 stars 增量排序，不支持额外筛选）
+    if f.sort == project::Sort::Rising {
+        let limit = per_page;
+        let data = project::rising(&s.pool, 24, limit).await?;
+        let total = data.len() as i64;
+        return Ok(Json(ListResponse {
+            data,
+            page,
+            per_page,
+            total,
+        }));
+    }
+
     let data = project::list(&s.pool, &f).await?;
     let total = project::count(&s.pool, &f).await?;
     Ok(Json(ListResponse {

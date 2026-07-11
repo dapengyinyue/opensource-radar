@@ -291,3 +291,55 @@ async fn upsert_updates_metrics_on_rescan() {
     assert_eq!(snaps[1].stars, Some(27000));
     let _ = Utc::now(); // ensure chrono Utc linked
 }
+
+#[tokio::test]
+async fn rising_orders_by_star_delta() {
+    let _g = SERIALIZE.lock().await;
+    let pool = setup().await;
+
+    // 项目 A：stars 100 -> 200，delta 100
+    let mut a = gh();
+    a.full_name = "a/rising-a".into();
+    a.name = "rising-a".into();
+    a.stargazers_count = 100;
+    let a_id = storage::repo::persist_raw_item(&pool, &RawItem::GithubRepo(a.clone()))
+        .await
+        .unwrap();
+    // 把这条快照改到 25h 前（模拟旧快照）
+    sqlx::query("UPDATE project_snapshots SET captured_at = now() - interval '25 hours' WHERE project_id = $1")
+        .bind(a_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // 第二次采集，stars 涨到 200（产生新快照，captured_at=now）
+    let mut a2 = a.clone();
+    a2.stargazers_count = 200;
+    storage::repo::persist_raw_item(&pool, &RawItem::GithubRepo(a2))
+        .await
+        .unwrap();
+
+    // 项目 B：stars 1000 -> 1050，delta 50（stars 更高但 delta 更小）
+    let mut b = gh();
+    b.full_name = "b/rising-b".into();
+    b.name = "rising-b".into();
+    b.stargazers_count = 1000;
+    let b_id = storage::repo::persist_raw_item(&pool, &RawItem::GithubRepo(b.clone()))
+        .await
+        .unwrap();
+    sqlx::query("UPDATE project_snapshots SET captured_at = now() - interval '25 hours' WHERE project_id = $1")
+        .bind(b_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut b2 = b.clone();
+    b2.stargazers_count = 1050;
+    storage::repo::persist_raw_item(&pool, &RawItem::GithubRepo(b2))
+        .await
+        .unwrap();
+
+    // rising(24h, 10)：A delta=100 应排在 B delta=50 之前
+    let rows = project::rising(&pool, 24, 10).await.unwrap();
+    assert!(rows.len() >= 2, "应有至少 2 个上升项目");
+    assert_eq!(rows[0].full_name.as_deref(), Some("a/rising-a"));
+    assert_eq!(rows[1].full_name.as_deref(), Some("b/rising-b"));
+}

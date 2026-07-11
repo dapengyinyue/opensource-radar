@@ -4,4 +4,5 @@
 pub mod error;
 pub mod models;
 pub mod normalize;
+pub mod notifier;
 pub mod source;

@@ -75,11 +75,7 @@ impl GithubAdapter {
         }
     }
 
-    async fn fetch_page(
-        &self,
-        query: &str,
-        page: u32,
-    ) -> Result<Vec<RepoJson>, SourceError> {
+    async fn fetch_page(&self, query: &str, page: u32) -> Result<Vec<RepoJson>, SourceError> {
         self.limiter.acquire().await;
 
         let mut req = self
@@ -98,12 +94,13 @@ impl GithubAdapter {
             req = req.header(header::AUTHORIZATION, format!("Bearer {tok}"));
         }
 
-        let resp = req.send().await.map_err(|e| SourceError::Other(e.to_string()))?;
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| SourceError::Other(e.to_string()))?;
         let status = resp.status();
 
-        if status == StatusCode::TOO_MANY_REQUESTS
-            || status == StatusCode::FORBIDDEN
-        {
+        if status == StatusCode::TOO_MANY_REQUESTS || status == StatusCode::FORBIDDEN {
             // 命中限流：轮换 token，交由调度器退避重试
             self.tokens.rotate();
             return Err(SourceError::RateLimited);
@@ -112,8 +109,10 @@ impl GithubAdapter {
             return Err(SourceError::Other(format!("github status {status}")));
         }
 
-        let parsed: SearchResponse =
-            resp.json().await.map_err(|e| SourceError::Other(e.to_string()))?;
+        let parsed: SearchResponse = resp
+            .json()
+            .await
+            .map_err(|e| SourceError::Other(e.to_string()))?;
         Ok(parsed.items)
     }
 }

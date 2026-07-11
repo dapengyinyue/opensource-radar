@@ -2,8 +2,8 @@
 
 use async_trait::async_trait;
 use governor::{
-    clock::DefaultClock, middleware::NoOpMiddleware, state::InMemoryState, state::NotKeyed,
-    Quota, RateLimiter,
+    clock::DefaultClock, middleware::NoOpMiddleware, state::InMemoryState, state::NotKeyed, Quota,
+    RateLimiter,
 };
 use std::num::NonZeroU32;
 

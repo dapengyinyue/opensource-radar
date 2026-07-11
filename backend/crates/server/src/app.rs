@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::routing::{get, post};
 use axum::Router;
+use domain::notifier::Notifier;
 use sqlx::PgPool;
 
 use crate::api;
@@ -11,6 +12,9 @@ pub struct AppState {
     pub pool: PgPool,
     pub collector: Arc<collector::scheduler::Collector>,
     pub admin_token: String,
+    /// 通知器。未配置 sendkey 时为 None。
+    pub notifier: Option<Arc<dyn Notifier>>,
+    pub digest_scheduler: Option<Arc<collector::digest_scheduler::DigestScheduler>>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -24,5 +28,6 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/topics", get(api::facets::topics))
         .route("/api/v1/sources/status", get(api::facets::sources_status))
         .route("/api/v1/admin/collect/:source", post(api::admin::collect))
+        .route("/api/v1/admin/digest", post(api::digest::trigger))
         .with_state(state)
 }

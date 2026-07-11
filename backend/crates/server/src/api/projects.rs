@@ -43,6 +43,7 @@ impl ListParams {
             q: self.q.clone(),
             sort: Sort::parse(&self.sort),
             since,
+            first_seen_since: None,
             page: self.page,
             per_page: self.per_page,
         }
@@ -78,8 +79,6 @@ pub async fn detail(
     State(s): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<project::Project>, ApiError> {
-    let p = project::get(&s.pool, id)
-        .await?
-        .ok_or(ApiError::NotFound)?;
+    let p = project::get(&s.pool, id).await?.ok_or(ApiError::NotFound)?;
     Ok(Json(p))
 }

@@ -70,14 +70,23 @@ async fn github_then_hn_merges_into_one_project() {
         .expect("persist github");
     let id2 = storage::repo::persist_raw_item(
         &pool,
-        &RawItem::HnStory(hn(Some("https://github.com/tokio-rs/tokio/issues/1"), "111")),
+        &RawItem::HnStory(hn(
+            Some("https://github.com/tokio-rs/tokio/issues/1"),
+            "111",
+        )),
     )
     .await
     .expect("persist hn");
 
-    assert_eq!(id1, id2, "HN linking same repo should merge into same project");
+    assert_eq!(
+        id1, id2,
+        "HN linking same repo should merge into same project"
+    );
 
-    let p = project::get(&pool, id1).await.unwrap().expect("project exists");
+    let p = project::get(&pool, id1)
+        .await
+        .unwrap()
+        .expect("project exists");
     assert_eq!(p.dedup_key, "gh:tokio-rs/tokio");
     assert!(p.source_kinds.contains(&"github".to_string()));
     assert!(p.source_kinds.contains(&"hackernews".to_string()));
@@ -145,8 +154,65 @@ async fn search_by_query_matches_name_full_name_description() {
     assert_eq!(hits[0].name, "tokio");
 
     // 无匹配
-    assert_eq!(project::list(&pool, &mk("nonexistent-zzz")).await.unwrap().len(), 0);
-    assert_eq!(project::count(&pool, &mk("nonexistent-zzz")).await.unwrap(), 0);
+    assert_eq!(
+        project::list(&pool, &mk("nonexistent-zzz"))
+            .await
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(
+        project::count(&pool, &mk("nonexistent-zzz")).await.unwrap(),
+        0
+    );
+}
+
+#[tokio::test]
+async fn first_seen_since_filter() {
+    let _g = SERIALIZE.lock().await;
+    let pool = setup().await;
+    // 两条项目，first_seen_at 默认是 now()
+    let gh_id = storage::repo::persist_raw_item(&pool, &RawItem::GithubRepo(gh()))
+        .await
+        .unwrap();
+    let ext_id = storage::repo::persist_raw_item(
+        &pool,
+        &RawItem::HnStory(hn(Some("https://crates.io/crates/axum"), "333")),
+    )
+    .await
+    .unwrap();
+
+    // 把 gh 的 first_seen_at 改到 48h 前（「老项目」），ext 保持 now()（「新项目」）
+    let old = chrono::Utc::now() - chrono::Duration::hours(48);
+    sqlx::query("UPDATE projects SET first_seen_at = $1 WHERE id = $2")
+        .bind(old)
+        .bind(gh_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let cutoff = chrono::Utc::now() - chrono::Duration::hours(24);
+    let f = project::ProjectFilter {
+        first_seen_since: Some(cutoff),
+        per_page: 100,
+        ..Default::default()
+    };
+    let hits = project::list(&pool, &f).await.unwrap();
+    assert_eq!(hits.len(), 1, "only the new project should match");
+    assert_eq!(hits[0].id, ext_id);
+    assert_eq!(project::count(&pool, &f).await.unwrap(), 1);
+
+    // 无 first_seen_since 过滤 -> 两条都在
+    let all = project::list(
+        &pool,
+        &project::ProjectFilter {
+            per_page: 100,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(all.len(), 2);
 }
 
 #[tokio::test]

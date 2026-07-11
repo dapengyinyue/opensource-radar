@@ -72,6 +72,8 @@ async fn setup() -> (AppState, sqlx::PgPool) {
         pool: pool.clone(),
         collector,
         admin_token: "secret".into(),
+        notifier: None,
+        digest_scheduler: None,
     };
     (state, pool)
 }
@@ -89,7 +91,11 @@ async fn list_and_detail() {
 
     let resp = app
         .clone()
-        .oneshot(Request::get("/api/v1/projects").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::get("/api/v1/projects")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -189,17 +195,22 @@ async fn facets_and_snapshots() {
 
     let resp = app
         .clone()
-        .oneshot(Request::get("/api/v1/languages").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::get("/api/v1/languages")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let langs = body_json(resp).await;
     assert!(langs.as_array().unwrap().iter().any(|f| f["key"] == "Rust"));
 
     // tokio project id
-    let id: i64 = sqlx::query_scalar("SELECT id FROM projects WHERE dedup_key = 'gh:tokio-rs/tokio'")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let id: i64 =
+        sqlx::query_scalar("SELECT id FROM projects WHERE dedup_key = 'gh:tokio-rs/tokio'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let resp = app
         .oneshot(
             Request::get(format!("/api/v1/projects/{id}/snapshots"))
@@ -291,12 +302,11 @@ async fn project_sources_returns_github_and_hn() {
         .unwrap();
 
     let app = router(state);
-    let tokio_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM projects WHERE dedup_key = 'gh:tokio-rs/tokio'",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let tokio_id: i64 =
+        sqlx::query_scalar("SELECT id FROM projects WHERE dedup_key = 'gh:tokio-rs/tokio'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
 
     let resp = app
         .clone()
@@ -334,4 +344,40 @@ async fn project_sources_404_for_missing() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn digest_unauthorized_without_token() {
+    let _g = SERIALIZE.lock().await;
+    let (state, _pool) = setup().await;
+    let app = router(state);
+
+    let resp = app
+        .oneshot(
+            Request::post("/api/v1/admin/digest")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn digest_returns_400_when_not_configured() {
+    let _g = SERIALIZE.lock().await;
+    let (state, _pool) = setup().await;
+    let app = router(state);
+
+    // notifier / digest_scheduler 为 None（setup 未配置 sendkey）
+    let resp = app
+        .oneshot(
+            Request::post("/api/v1/admin/digest")
+                .header("X-Admin-Token", "secret")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }

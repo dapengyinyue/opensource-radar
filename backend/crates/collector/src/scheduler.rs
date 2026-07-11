@@ -134,7 +134,9 @@ async fn fetch_with_retry(
             Err(SourceError::Cancelled) => anyhow::bail!("cancelled"),
             Err(e) => {
                 if attempt + 1 == MAX_ATTEMPTS {
-                    anyhow::bail!(format!("fetch {name} failed after {MAX_ATTEMPTS} attempts: {e}"));
+                    anyhow::bail!(format!(
+                        "fetch {name} failed after {MAX_ATTEMPTS} attempts: {e}"
+                    ));
                 }
                 warn!(source = %name, attempt, error = %e, "fetch failed, retrying");
                 tokio::select! {

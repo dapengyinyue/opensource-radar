@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod digest;
 pub mod facets;
 pub mod health;
 pub mod projects;

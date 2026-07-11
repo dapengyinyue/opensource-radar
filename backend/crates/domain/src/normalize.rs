@@ -17,10 +17,8 @@ use crate::source::{GithubRepoRaw, HnStoryRaw, RawItem};
 fn github_repo_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(
-            r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/#?]+?)(?:\.git)?(?:[/?#].*)?$",
-        )
-        .expect("valid github regex")
+        Regex::new(r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/#?]+?)(?:\.git)?(?:[/?#].*)?$")
+            .expect("valid github regex")
     })
 }
 
@@ -265,7 +263,10 @@ mod tests {
         );
         let r = normalize(&RawItem::HnStory(s));
         assert_eq!(r.dedup_key, "url:crates.io/crates/axum");
-        assert_eq!(r.repo_url.as_deref(), Some("https://crates.io/crates/axum/?version=0.7"));
+        assert_eq!(
+            r.repo_url.as_deref(),
+            Some("https://crates.io/crates/axum/?version=0.7")
+        );
         assert_eq!(r.hn_points, Some(120));
     }
 
@@ -291,15 +292,24 @@ mod tests {
 
     #[test]
     fn normalize_url_strips_query_fragment_www_trailing_slash() {
-        assert_eq!(normalize_url("https://www.Crates.io/crates/axum/"), "crates.io/crates/axum");
-        assert_eq!(normalize_url("https://example.com/path?q=1#frag"), "example.com/path");
+        assert_eq!(
+            normalize_url("https://www.Crates.io/crates/axum/"),
+            "crates.io/crates/axum"
+        );
+        assert_eq!(
+            normalize_url("https://example.com/path?q=1#frag"),
+            "example.com/path"
+        );
         assert_eq!(normalize_url("http://www.example.com"), "example.com");
         assert_eq!(normalize_url("example.com/"), "example.com");
     }
 
     #[test]
     fn extract_github_identity_rejects_non_repo() {
-        assert_eq!(extract_github_identity("https://github.com/tokio-rs/tokio"), Some(("tokio-rs".into(), "tokio".into())));
+        assert_eq!(
+            extract_github_identity("https://github.com/tokio-rs/tokio"),
+            Some(("tokio-rs".into(), "tokio".into()))
+        );
         assert_eq!(extract_github_identity("https://gitlab.com/a/b"), None);
         assert_eq!(extract_github_identity("not a url"), None);
     }

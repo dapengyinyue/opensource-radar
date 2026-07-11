@@ -204,7 +204,10 @@ mod tests {
         match &items[0] {
             RawItem::HnStory(h) => {
                 assert_eq!(h.object_id, "1");
-                assert_eq!(h.linked_url.as_deref(), Some("https://github.com/tokio-rs/tokio"));
+                assert_eq!(
+                    h.linked_url.as_deref(),
+                    Some("https://github.com/tokio-rs/tokio")
+                );
                 assert_eq!(h.points, Some(120));
                 assert_eq!(h.comment_count, Some(45));
             }

@@ -136,7 +136,10 @@ pub struct ProjectFilter {
     /// 全文搜索：匹配 name / full_name / description（ILIKE）
     pub q: Option<String>,
     pub sort: Sort,
+    /// 活跃时间下限（last_activity_at >= since）
     pub since: Option<DateTime<Utc>>,
+    /// 首次发现时间下限（first_seen_at >= first_seen_since），日报「今日新发现」用
+    pub first_seen_since: Option<DateTime<Utc>>,
     pub page: i64,
     pub per_page: i64,
 }
@@ -166,8 +169,9 @@ where
            AND ($5::text IS NULL OR name ILIKE '%' || $5 || '%' \
                 OR full_name ILIKE '%' || $5 || '%' \
                 OR description ILIKE '%' || $5 || '%') \
+           AND ($6::timestamptz IS NULL OR first_seen_at >= $6) \
          ORDER BY {} \
-         LIMIT $6 OFFSET $7",
+         LIMIT $7 OFFSET $8",
         f.sort.order_by()
     );
     let rows = sqlx::query_as::<_, Project>(&sql)
@@ -176,6 +180,7 @@ where
         .bind(&f.source)
         .bind(f.since)
         .bind(&f.q)
+        .bind(f.first_seen_since)
         .bind(per_page)
         .bind(offset)
         .fetch_all(exec)
@@ -208,13 +213,15 @@ where
            AND ($4::timestamptz IS NULL OR last_activity_at >= $4) \
            AND ($5::text IS NULL OR name ILIKE '%' || $5 || '%' \
                 OR full_name ILIKE '%' || $5 || '%' \
-                OR description ILIKE '%' || $5 || '%')",
+                OR description ILIKE '%' || $5 || '%') \
+           AND ($6::timestamptz IS NULL OR first_seen_at >= $6)",
     )
     .bind(&f.language)
     .bind(&f.topic)
     .bind(&f.source)
     .bind(f.since)
     .bind(&f.q)
+    .bind(f.first_seen_since)
     .fetch_one(exec)
     .await?;
     Ok(n)

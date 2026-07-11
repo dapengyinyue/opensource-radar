@@ -5,10 +5,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use collector::scheduler::{Collector, ScheduledAdapter};
 use domain::error::SourceError;
 use domain::models::SourceKind;
 use domain::source::{GithubRepoRaw, HnStoryRaw, RawItem, SourceAdapter};
-use collector::scheduler::{Collector, ScheduledAdapter};
 use sqlx::PgPool;
 use storage::pool;
 use tokio_util::sync::CancellationToken;
@@ -110,7 +110,10 @@ async fn run_once_persists_items() {
         .await
         .unwrap();
     assert_eq!(n, 1);
-    let p = storage::repo::project::get(&pool, 1).await.unwrap().unwrap();
+    let p = storage::repo::project::get(&pool, 1)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(p.source_kinds.contains(&"github".to_string()));
     assert!(p.source_kinds.contains(&"hackernews".to_string()));
 }

@@ -1,4 +1,4 @@
-//! Server酱通知器。POST https://sct.ftqq.com/{sendkey}.send
+//! Server酱通知器。POST https://sctapi.ftqq.com/{sendkey}.send
 
 use async_trait::async_trait;
 use domain::notifier::{Notifier, NotifyError};
@@ -14,7 +14,7 @@ impl ServerChanNotifier {
         Self {
             client,
             sendkey,
-            base_url: "https://sct.ftqq.com".into(),
+            base_url: "https://sctapi.ftqq.com".into(),
         }
     }
 

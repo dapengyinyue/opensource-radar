@@ -82,13 +82,14 @@ async fn run_digest(pool: &PgPool, notifier: &dyn Notifier, top_n: i64) {
 }
 
 impl DigestScheduler {
-    /// 手动触发一次日报（admin 端点用）。
+    /// 手动触发一次日报（admin 端点用）。发送失败返回 Err（不误报 sent）。
     pub async fn run_once(&self) -> anyhow::Result<Option<crate::digest::DigestReport>> {
         let report = generate_digest(&self.pool, self.top_n).await?;
         if let Some(ref r) = report {
-            if let Err(e) = self.notifier.send(&r.title, &r.markdown).await {
-                warn!(error = %e, "manual digest push failed");
-            }
+            self.notifier
+                .send(&r.title, &r.markdown)
+                .await
+                .map_err(|e| anyhow::anyhow!("digest push failed: {e}"))?;
         }
         Ok(report)
     }

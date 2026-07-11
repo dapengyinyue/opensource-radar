@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getProject, getProjectSources, listSnapshots } from "../api/client";
+import { getProject, getProjectSources, listProjects, listSnapshots } from "../api/client";
 import SourceBadge from "../components/SourceBadge";
 import MetricSparkline from "../components/MetricSparkline";
 import { formatCompact, minutesAgo, timeAgo } from "../lib/format";
@@ -84,6 +84,15 @@ export default function ProjectDetailPage() {
     enabled: Number.isFinite(numId),
   });
 
+  // 相关项目：取第一个 topic 查同话题 hottest TOP5
+  const relatedTopic = project?.topics[0];
+  const { data: related } = useQuery({
+    queryKey: ["relatedProjects", relatedTopic, numId],
+    queryFn: () => listProjects({ topic: relatedTopic, sort: "hottest", per_page: 6 }),
+    enabled: !!relatedTopic,
+  });
+  const relatedProjects = (related?.data ?? []).filter((p) => p.id !== numId).slice(0, 5);
+
   if (isLoading) return <p className="text-slate-500">加载中…</p>;
   if (error) return <p className="text-red-600">加载失败：{(error as Error).message}</p>;
   if (!project) return <p className="text-slate-500">未找到项目。</p>;
@@ -118,14 +127,29 @@ export default function ProjectDetailPage() {
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-x-8 md:grid-cols-2">
-          <Field label="语言">{project.language ?? "-"}</Field>
+          <Field label="语言">
+            {project.language ? (
+              <Link
+                to={`/?language=${encodeURIComponent(project.language)}`}
+                className="text-blue-600 hover:underline"
+              >
+                {project.language}
+              </Link>
+            ) : (
+              "-"
+            )}
+          </Field>
           <Field label="Open Issues">{project.open_issues ?? "-"}</Field>
           <Field label="Topics">
             <div className="flex flex-wrap gap-1">
               {project.topics.map((t) => (
-                <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                <Link
+                  key={t}
+                  to={`/?topic=${encodeURIComponent(t)}`}
+                  className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-blue-600 hover:bg-blue-50 hover:underline"
+                >
                   {t}
-                </span>
+                </Link>
               ))}
             </div>
           </Field>
@@ -203,6 +227,31 @@ export default function ProjectDetailPage() {
       <Section title="指标趋势（快照）">
         <MetricSparkline snapshots={snapshots ?? []} />
       </Section>
+
+      {relatedTopic && relatedProjects.length > 0 && (
+        <Section title={`相关项目 · ${relatedTopic}`}>
+          <ul className="divide-y">
+            {relatedProjects.map((p) => (
+              <li key={p.id} className="py-2">
+                <Link
+                  to={{ pathname: `/projects/${p.id}`, search: returnSearch }}
+                  className="font-medium text-blue-600 hover:underline"
+                >
+                  {p.full_name ?? p.name}
+                </Link>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span>⭐{formatCompact(p.stars)}</span>
+                  {p.hn_points != null && <span>🟧{formatCompact(p.hn_points)}</span>}
+                  {p.language && <span>· {p.language}</span>}
+                </div>
+                {p.description && (
+                  <p className="max-w-md truncate text-xs text-slate-500">{p.description}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
     </div>
   );
 }

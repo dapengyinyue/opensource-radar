@@ -70,7 +70,14 @@ export default function RankingTable({ projects, returnSearch, hasFilter, onClea
                   ))}
                 </div>
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">{formatCompact(p.stars)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {formatCompact(p.stars)}
+                {p.star_delta != null && p.star_delta > 0 && (
+                  <span className="ml-1 text-xs font-medium text-emerald-600">
+                    +{formatCompact(p.star_delta)}
+                  </span>
+                )}
+              </td>
               <td className="px-3 py-2 text-right tabular-nums">{formatCompact(p.hn_points)}</td>
               <td className="px-3 py-2">{p.language ?? "-"}</td>
               <td className="px-3 py-2 text-slate-500">{timeAgo(p.last_activity_at)}</td>

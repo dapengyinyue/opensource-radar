@@ -29,6 +29,10 @@ pub struct Project {
     pub metadata: serde_json::Value,
     pub first_seen_at: DateTime<Utc>,
     pub last_collected_at: DateTime<Utc>,
+    /// stars 增量：仅 `rising` 查询填充，list/get 为 None。
+    #[sqlx(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub star_delta: Option<i64>,
 }
 
 const UPSERT_SQL: &str = r#"
@@ -141,7 +145,7 @@ pub struct ProjectFilter {
     pub sort: Sort,
     /// 活跃时间下限（last_activity_at >= since）
     pub since: Option<DateTime<Utc>>,
-    /// 首次发现时间下限（first_seen_at >= first_seen_since），日报「今日新发现」用
+    /// 首次发现时间下限（first_seen_at >= first_seen_since），list/count 过滤用
     pub first_seen_since: Option<DateTime<Utc>>,
     pub page: i64,
     pub per_page: i64,
@@ -233,8 +237,8 @@ where
 /// 上升最快：比较每个项目「最近快照」与「hours 小时前快照」的 stars 增量，
 /// 按增量降序返回。仅返回增量 > 0 的项目。独立查询，不走 list 的 filter 体系。
 pub async fn rising(pool: &sqlx::PgPool, hours: i32, limit: i64) -> Result<Vec<Project>> {
-    let sql = format!(
-        r#"
+    // 独立 SELECT（不用 SELECT_COLS）：末尾多取 r.star_delta 填充 Project::star_delta。
+    let sql = r#"
         WITH latest AS (
             SELECT DISTINCT ON (project_id) project_id, stars
             FROM project_snapshots
@@ -253,14 +257,19 @@ pub async fn rising(pool: &sqlx::PgPool, hours: i32, limit: i64) -> Result<Vec<P
             LEFT JOIN past p ON p.project_id = l.project_id
             WHERE l.stars IS NOT NULL
         )
-        {SELECT_COLS}
+        SELECT id, dedup_key, name, full_name, description, repo_url, homepage_url, language,
+               topics, stars, forks, open_issues, hn_points, hn_comment_count,
+               github_created_at, github_updated_at, last_activity_at,
+               source_kinds::text[] AS source_kinds,
+               metadata, first_seen_at, last_collected_at,
+               r.star_delta
+        FROM projects
         JOIN ranked r ON r.project_id = projects.id
         WHERE r.star_delta > 0
         ORDER BY r.star_delta DESC
         LIMIT $2
-        "#,
-    );
-    let rows = sqlx::query_as::<_, Project>(&sql)
+        "#;
+    let rows = sqlx::query_as::<_, Project>(sql)
         .bind(hours)
         .bind(limit)
         .fetch_all(pool)

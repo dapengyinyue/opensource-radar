@@ -341,5 +341,7 @@ async fn rising_orders_by_star_delta() {
     let rows = project::rising(&pool, 24, 10).await.unwrap();
     assert!(rows.len() >= 2, "应有至少 2 个上升项目");
     assert_eq!(rows[0].full_name.as_deref(), Some("a/rising-a"));
+    assert_eq!(rows[0].star_delta, Some(100), "rising 应填充 star_delta");
     assert_eq!(rows[1].full_name.as_deref(), Some("b/rising-b"));
+    assert_eq!(rows[1].star_delta, Some(50));
 }

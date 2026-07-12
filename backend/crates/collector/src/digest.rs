@@ -1,4 +1,4 @@
-//! 日报生成：查近 24h 新发现项目，拼 markdown。
+//! 日报生成：取近 24h stars 增量 TOP N，拼 markdown。
 
 use std::time::Duration;
 
@@ -6,7 +6,7 @@ use anyhow::Result;
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, TimeZone, Utc};
 use sqlx::PgPool;
 
-use storage::repo::project::{self, ProjectFilter, Sort};
+use storage::repo::project;
 
 /// 一份日报。
 pub struct DigestReport {
@@ -15,16 +15,10 @@ pub struct DigestReport {
     pub count: usize,
 }
 
-/// 生成今日新发现日报。无新项目返回 `Ok(None)`（当天不发空报）。
+/// 生成「上升最快」日报：取近 24h stars 增量 TOP N。
+/// 无上升项目返回 `Ok(None)`（当天不发空报）。
 pub async fn generate_digest(pool: &PgPool, top_n: i64) -> Result<Option<DigestReport>> {
-    let cutoff = Utc::now() - ChronoDuration::hours(24);
-    let filter = ProjectFilter {
-        first_seen_since: Some(cutoff),
-        sort: Sort::Hottest,
-        per_page: top_n,
-        ..Default::default()
-    };
-    let projects = project::list(pool, &filter).await?;
+    let projects = project::rising(pool, 24, top_n).await?;
 
     if projects.is_empty() {
         return Ok(None);
@@ -33,7 +27,7 @@ pub async fn generate_digest(pool: &PgPool, top_n: i64) -> Result<Option<DigestR
     let count = projects.len();
     let now = Utc::now();
     let title = format!("开源雷达日报 · {}月{}日", now.month(), now.day());
-    let mut md = String::from("## 今日新发现 TOP ");
+    let mut md = String::from("## 上升最快 TOP ");
     md.push_str(&count.to_string());
     md.push_str("\n\n");
     for (i, p) in projects.iter().enumerate() {
@@ -41,11 +35,15 @@ pub async fn generate_digest(pool: &PgPool, top_n: i64) -> Result<Option<DigestR
         let name = p.full_name.as_deref().unwrap_or(&p.name);
         let link = p.repo_url.as_deref().unwrap_or("#");
         let stars = p.stars.map(fmt_count).unwrap_or_else(|| "-".into());
+        let delta = p
+            .star_delta
+            .map(|d| format!(" 🔺+{}", fmt_count(d)))
+            .unwrap_or_default();
         let hn = p
             .hn_points
             .map(|v| format!("🟧{}", fmt_count(v)))
             .unwrap_or_default();
-        md.push_str(&format!("{n}. **[{name}]({link})** ⭐{stars}"));
+        md.push_str(&format!("{n}. **[{name}]({link})** ⭐{stars}{delta}"));
         if !hn.is_empty() {
             md.push_str(&format!(" · {hn}"));
         }

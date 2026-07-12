@@ -24,6 +24,8 @@ export interface Project {
   metadata: Record<string, unknown>;
   first_seen_at: string;
   last_collected_at: string;
+  /** stars 增量（仅 rising 榜返回，其他接口不出现） */
+  star_delta?: number;
 }
 
 export interface ListResponse {

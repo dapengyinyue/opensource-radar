@@ -37,7 +37,7 @@ pub async fn trigger(
         )),
         None => Ok((
             StatusCode::OK,
-            Json(json!({ "status": "empty", "count": 0, "message": "近 24h 无新发现项目" })),
+            Json(json!({ "status": "empty", "count": 0, "message": "近 24h 无上升项目" })),
         )),
     }
 }

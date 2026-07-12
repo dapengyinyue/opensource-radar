@@ -76,7 +76,7 @@ async fn run_digest(pool: &PgPool, notifier: &dyn Notifier, top_n: i64) {
                 warn!(error = %e, "digest push failed");
             }
         }
-        Ok(None) => info!("no new projects today, skip digest"),
+        Ok(None) => info!("no rising projects in 24h, skip digest"),
         Err(e) => warn!(error = %e, "generate digest failed"),
     }
 }
